@@ -366,12 +366,17 @@ int HDF5Read()
 #include "Hdf5Reader.h"
 #include "Hdf5Group.h"
 #include "Hdf5Parser.h"
+
+#define MEMORY_MAX1 10 * 1024 * 1024 * 1024		// 10G
+
 int main()
 {
     std::cout << "################### Hello World!\n" << endl;
 
-    Hdf5Parser parser;
-    parser.readHdf5("SystemResponse.h5");
-    H5Data h5Data = parser.getH5Data();
+	Hdf5Parser parser;
+	parser.readHdf5("SystemResponse.h5");
+	H5Data h5Data = parser.getH5Data();
+
+    cout << parser.getMemSize() << endl;
 
 }

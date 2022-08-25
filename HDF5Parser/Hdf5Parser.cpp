@@ -1,9 +1,11 @@
 #include "Hdf5Parser.h"
 
 #include <iostream>
-#define OBJ_NAME_LEN 260
 
-Hdf5Parser::Hdf5Parser()
+#define OBJ_NAME_LEN 260
+#define MEMORY_MAX 10 * 1024 * 1024 * 1024		// 10G
+
+Hdf5Parser::Hdf5Parser() : m_memSize(0ULL)
 {
 }
 
@@ -16,21 +18,39 @@ H5Data Hdf5Parser::getH5Data()
 	return m_h5Data;
 }
 
+ULLONG Hdf5Parser::getMemSize()
+{
+	return m_memSize;
+}
+
 bool Hdf5Parser::readHdf5(const char* path)
 {
 	H5File file(path, H5F_ACC_RDONLY);
-	objTraverse(file);
+	bool success = objTraverse(file);
+	if (!success)
+	{
+		// TODO
+		return false;
+	}
 
-	return false;
+	return true;
 }
 
-void Hdf5Parser::readH5Group(const Group& group, const char* objName)
+// 递归读取group
+bool Hdf5Parser::readH5Group(const Group& group, const char* objName)
 {
 	Group _group = group.openGroup(objName);
-	objTraverse(_group);
+	bool success = objTraverse(_group);
+	if (!success)
+	{
+		// TODO
+		return false;
+	}
+
+	return true;
 }
 
-void Hdf5Parser::readH5DataSet(const Group& group, const char* objName)
+bool Hdf5Parser::readH5DataSet(const Group& group, const char* objName)
 {
 	DataSet dataset = group.openDataSet(objName);
 	DataSpace fspace = dataset.getSpace();
@@ -50,8 +70,8 @@ void Hdf5Parser::readH5DataSet(const Group& group, const char* objName)
 	DataSpace mspace(1, mdim);
 	mspace.selectHyperslab(H5S_SELECT_SET, count, start, NULL, NULL);
 
-	float* outdata = new float[DIM];
-	dataset.read(outdata, PredType::NATIVE_FLOAT, mspace, fspace);
+	double* outdata = new double[DIM];
+	dataset.read(outdata, PredType::NATIVE_DOUBLE, mspace, fspace);
 
 	BASEDATAVec baseData;
 	for (int i = 0;i< DIM;i++)
@@ -59,14 +79,26 @@ void Hdf5Parser::readH5DataSet(const Group& group, const char* objName)
 		baseData.emplace_back(outdata[i]);
 	}
 
+	// 超过一定大小，表明读取文件失败，此时返回失败,并清空数据
+	m_memSize += sizeof(double) * DIM;
+	if (m_memSize > MEMORY_MAX)
+	{
+		m_h5Data.clear();
+		return false;
+	}
+
 	m_h5Data.insert(std::pair<std::string, BASEDATAVec>(buffname,baseData));
 
 	delete[] outdata;
 	outdata = NULL;
+
+	return true;
 }
 
-void Hdf5Parser::objTraverse(const Group& group)
+// 遍历节点object元素
+bool Hdf5Parser::objTraverse(const Group& group)
 {
+	bool isTraverse = false;
 	for (size_t i = 0; i < group.getNumObjs(); i++)
 	{
 		char objName[OBJ_NAME_LEN];
@@ -82,14 +114,10 @@ void Hdf5Parser::objTraverse(const Group& group)
 		case H5O_TYPE_UNKNOWN:
 			break;
 		case H5O_TYPE_GROUP:
-		{
-			readH5Group(group, objName);
-		}
+			isTraverse = readH5Group(group, objName);	// 此处递归不可直接return
 			break;
 		case H5O_TYPE_DATASET:
-		{
-			readH5DataSet(group, objName);
-		}
+			isTraverse = readH5DataSet(group, objName);
 			break;
 		case H5O_TYPE_NAMED_DATATYPE:
 			break;
@@ -101,4 +129,6 @@ void Hdf5Parser::objTraverse(const Group& group)
 			break;
 		}
 	}
+
+	return isTraverse;
 }
