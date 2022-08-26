@@ -13,9 +13,14 @@ Hdf5Parser::~Hdf5Parser()
 {
 }
 
-H5Data Hdf5Parser::getH5Data()
+H5Data1Dim Hdf5Parser::getH5Data1Dim()
 {
-	return m_h5Data;
+	return m_data1Dim;
+}
+
+H5Data2Dim Hdf5Parser::getH5Data2Dim()
+{
+	return m_data2Dim;
 }
 
 ULLONG Hdf5Parser::getMemSize()
@@ -52,47 +57,87 @@ bool Hdf5Parser::readH5Group(const Group& group, const char* objName)
 
 bool Hdf5Parser::readH5DataSet(const Group& group, const char* objName)
 {
-	DataSet dataset = group.openDataSet(objName);
+	double* outdata = nullptr;
+	DataSet dataset = group.openDataSet(objName);	
 	DataSpace fspace = dataset.getSpace();
-
-	char buffname[OBJ_NAME_LEN] = {0};
-	dataset.getObjName(buffname,260);
-
-	hsize_t dims_out[1];
-	int dims = fspace.getSimpleExtentDims(dims_out, NULL);
-	const int DIM = dims_out[0];
-
-	hsize_t start[1];
-	hsize_t count[1];
-	start[0] = 0;
-	count[0] = DIM;
-	hsize_t mdim[] = { DIM };
-	DataSpace mspace(1, mdim);
-	mspace.selectHyperslab(H5S_SELECT_SET, count, start, NULL, NULL);
-
-	double* outdata = new double[DIM];
-	dataset.read(outdata, PredType::NATIVE_DOUBLE, mspace, fspace);
-
-	BASEDATAVec baseData;
-	for (int i = 0;i< DIM;i++)
+	hsize_t* dims_size = new hsize_t[fspace.getSimpleExtentNdims()];
+	int dims = fspace.getSimpleExtentDims(dims_size, NULL);
+	if (dims == 1)	// 一维dataSet
 	{
-		baseData.emplace_back(outdata[i]);
+		int dimNum = dims_size[0];
+		hsize_t start[1] = { 0 };
+		hsize_t count[1] = { dimNum };
+
+		DataSpace mspace(dims, dims_size);
+		mspace.selectHyperslab(H5S_SELECT_SET, count, start, NULL, NULL);
+
+		outdata = new double[dimNum];
+		dataset.read(outdata, PredType::NATIVE_DOUBLE, mspace, fspace);
+
+		DATA1DIM baseData;
+		for (int i = 0; i < dimNum; i++)
+		{
+			baseData.emplace_back(outdata[i]);
+		}
+
+		// 超过一定大小，表明读取文件失败，此时返回失败,并清空数据
+		m_memSize += sizeof(double) * dimNum;
+		if (m_memSize > MEMORY_MAX)
+		{
+			m_data1Dim.clear();
+			return false;
+		}
+
+		char buffname[OBJ_NAME_LEN] = { 0 };
+		dataset.getObjName(buffname, 260);
+		m_data1Dim.insert(std::pair<std::string, DATA1DIM>(buffname, baseData));
 	}
 
-	// 超过一定大小，表明读取文件失败，此时返回失败,并清空数据
-	m_memSize += sizeof(double) * DIM;
-	if (m_memSize > MEMORY_MAX)
+	if (dims == 2)	// 二维dataSet
 	{
-		m_h5Data.clear();
-		return false;
-	}
+		int dim = dims_size[0] * dims_size[1];
+		hsize_t start[2] = { 0 };
+		hsize_t count[2] = { dims_size[0],dims_size[1] };
 
-	m_h5Data.insert(std::pair<std::string, BASEDATAVec>(buffname,baseData));
+		DataSpace mspace(dims, dims_size);
+		mspace.selectHyperslab(H5S_SELECT_SET, count, start, NULL, NULL);
+
+		outdata = new double[dim];
+		dataset.read(outdata, PredType::NATIVE_DOUBLE, mspace, fspace); //第一个参数只能传一维数组
+
+		DATA1DIM data1Dim;
+		DATA2DIM data2Dim;
+		for (int i = 0; i < dims_size[0]; i++)
+		{
+			for (int j = 0; j < dims_size[1]; j++)
+			{
+				data1Dim.emplace_back(outdata[i * dims_size[1] + j]);
+			}
+
+			data2Dim.emplace_back(data1Dim);
+			data1Dim.clear();	// data1Dim需清空，否则上一维获取的数据会残留
+		}
+
+		// 超过一定大小，表明读取文件失败，此时返回失败,并清空数据
+		m_memSize += sizeof(double) * dim;
+		if (m_memSize > MEMORY_MAX)
+		{
+			m_data1Dim.clear();
+			return false;
+		}
+
+		char buffname[OBJ_NAME_LEN] = { 0 };
+		dataset.getObjName(buffname, OBJ_NAME_LEN);
+		m_data2Dim.insert(std::pair<std::string, DATA2DIM>(buffname, data2Dim));
+	}
 
 	delete[] outdata;
-	outdata = NULL;
+	delete[] dims_size;
+	outdata = nullptr;
+	dims_size = nullptr;
 
 	return true;
+
 }
 
 // 遍历节点object元素
@@ -132,3 +177,4 @@ bool Hdf5Parser::objTraverse(const Group& group)
 
 	return isTraverse;
 }
+

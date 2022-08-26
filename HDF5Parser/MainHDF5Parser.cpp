@@ -101,7 +101,7 @@ const int   FSPACE_DIM1 = 8;    // Dimension sizes of the dataset as it is
 const int   FSPACE_DIM2 = 12;   //  stored in the file
 const int   MSPACE_RANK = 2;    // Rank of the first dataset in memory
 const int   MSPACE_DIM1 = 8;    // We will read dataset back from the file
-const int   MSPACE_DIM2 = 9;    //  to the dataset in memory with these
+const int   MSPACE_DIM2 = 12;    //  to the dataset in memory with these
 				//  dataspace parameters
 const int   NPOINTS = 4;    // Number of points that will be selected
 				//  and overwritten
@@ -252,58 +252,44 @@ int HDF5Write() {
          *                      0 59  0 61
          *
          */
-        start[0] = 1; start[1] = 2;
-        block[0] = 1; block[1] = 1;
-        stride[0] = 1; stride[1] = 1;
-        count[0] = 3; count[1] = 4;
-        fspace.selectHyperslab(H5S_SELECT_SET, count, start, stride, block);
-        /*
-         * Add second selected hyperslab to the selection.
-         * The following elements are selected:
-         *                    19 20  0 21 22
-         *                     0 61  0  0  0
-         *                    27 28  0 29 30
-         *                    35 36 67 37 38
-         *                    43 44  0 45 46
-         *                     0  0  0  0  0
-         * Note that two hyperslabs overlap. Common elements are:
-         *                                              19 20
-         *                                               0 61
-         */
-        start[0] = 2; start[1] = 4;
-        block[0] = 1; block[1] = 1;
-        stride[0] = 1; stride[1] = 1;
-        count[0] = 6; count[1] = 5;
-        fspace.selectHyperslab(H5S_SELECT_OR, count, start, stride, block);
+        int rank = fspace.getSimpleExtentNdims();
+        cout << "rank=" << rank << endl;
+
+        hsize_t* dims_size = new hsize_t[rank];
+        //int dims = fspace.getSimpleExtentDims(dims_size, NULL);
+
+        const int row = dims_size[0];
+        const int colum = dims_size[1];
+
+        start[0] = 0; start[1] = 0;
+        count[0] = row; count[1] = colum;
+
+        fspace.selectHyperslab(H5S_SELECT_SET, count, start, NULL, NULL);
+
         /*
          * Create memory dataspace.
          */
-        hsize_t mdim[] = { MSPACE_DIM1, MSPACE_DIM2 }; /* Dimension sizes of the
-                                                       dataset in memory when we
-                                                       read selection from the
-                                                       dataset on the disk */
-        DataSpace mspace(MSPACE_RANK, mdim);
+        hsize_t mdim[] = { row, colum };
+        DataSpace mspace(rank, mdim);
         /*
          * Select two hyperslabs in memory. Hyperslabs has the same
          * size and shape as the selected hyperslabs for the file dataspace.
          */
         start[0] = 0; start[1] = 0;
-        block[0] = 1; block[1] = 1;
-        stride[0] = 1; stride[1] = 1;
-        count[0] = 3; count[1] = 4;
-        mspace.selectHyperslab(H5S_SELECT_SET, count, start, stride, block);
-        start[0] = 1; start[1] = 2;
-        block[0] = 1; block[1] = 1;
-        stride[0] = 1; stride[1] = 1;
-        count[0] = 6; count[1] = 5;
-        mspace.selectHyperslab(H5S_SELECT_OR, count, start, stride, block);
+        count[0] = row; count[1] = colum;
+        mspace.selectHyperslab(H5S_SELECT_SET, count, start, NULL, NULL);
         /*
          * Initialize data buffer.
          */
-        int matrix_out[MSPACE_DIM1][MSPACE_DIM2];
-        for (i = 0; i < MSPACE_DIM1; i++)
-            for (j = 0; j < MSPACE_DIM2; j++)
-                matrix_out[i][j] = 0;
+        //int matrix_out[MSPACE_DIM1][MSPACE_DIM2];
+        //for (i = 0; i < MSPACE_DIM1; i++)
+        //    for (j = 0; j < MSPACE_DIM2; j++)
+        //        matrix_out[i][j] = 0;
+
+        //int matrix[row][colum];
+
+        int* matrix_out = new int[row * colum];
+
         /*
          * Read data back to the buffer matrix.
          */
@@ -321,10 +307,13 @@ int HDF5Write() {
          *                     0  0  0  0  0  0  0  0  0
          */
 
-        for (i = 0; i < MSPACE_DIM1; i++)
+        for (int i = 0; i < row; i++)
         {
-            for (j = 0; j < MSPACE_DIM2; j++)
-                cout << matrix_out[i][j] << "  ";
+            for (int j = 0;j<colum;j++)
+            {
+                cout << matrix_out[i * colum + j] << " ";
+            }
+
             cout << endl;
         }
         /*
@@ -354,15 +343,6 @@ int HDF5Write() {
     return 0;
 }
 
-
-int HDF5Read()
-{
-
-
-
-    return 0;
-}
-
 #include "Hdf5Reader.h"
 #include "Hdf5Group.h"
 #include "Hdf5Parser.h"
@@ -375,8 +355,11 @@ int main()
 
 	Hdf5Parser parser;
 	parser.readHdf5("SystemResponse.h5");
-	H5Data h5Data = parser.getH5Data();
+    H5Data1Dim h5Data = parser.getH5Data1Dim();
 
-    cout << parser.getMemSize() << endl;
+    H5Data2Dim h5Data2Dim = parser.getH5Data2Dim();
+	cout << parser.getMemSize() << endl;
+
+    //HDF5Write();
 
 }
