@@ -354,12 +354,25 @@ int main()
     std::cout << "################### Hello World!\n" << endl;
 
 	Hdf5Parser parser;
-	parser.readHdf5("SystemResponse.h5");
-    H5Data1Dim h5Data = parser.getH5Data1Dim();
 
-    H5Data2Dim h5Data2Dim = parser.getH5Data2Dim();
+	parser.readHdf5("SystemResponse.h5"); //SystemResponse
+
+    H5Data data;
+    parser.getHdf5Data(data);
+
+    cout << endl << endl;
+    for (auto d : data.data1Dim)
+    {
+        cout << d.first << " 1 " << d.second << endl;
+    }
+
+	for (auto d : data.data2Dim)
+	{
+		cout << d.first << " 2 " << d.second << endl;
+	}
+
 	cout << parser.getMemSize() << endl;
 
-    //HDF5Write();
+
 
 }

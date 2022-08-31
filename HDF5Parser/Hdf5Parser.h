@@ -10,31 +10,40 @@
 #include <map>
 #include <queue>
 #include "H5Cpp.h"
-using namespace H5;
+#include "Eigen/Eigen"
 
 typedef unsigned long long ULLONG;
-typedef std::vector<double> DATA1DIM;
-typedef std::vector<DATA1DIM> DATA2DIM;
-typedef std::map<std::string, DATA1DIM> H5Data1Dim;
-typedef std::map<std::string, DATA2DIM> H5Data2Dim;
+
+typedef std::map<std::string, Eigen::VectorXd> EigenH51Dim;
+typedef std::map<std::string, Eigen::MatrixXd> EigenH52Dim;
+
+typedef struct Hdf5Data
+{
+	EigenH51Dim data1Dim;
+	EigenH52Dim data2Dim;
+} H5Data;
 
 class Hdf5Parser
 {
 public:
 	Hdf5Parser();
 	~Hdf5Parser();
-	H5Data1Dim getH5Data1Dim();
-	H5Data2Dim getH5Data2Dim();
-	ULLONG getMemSize();
+	void getHdf5Data(H5Data& h5Data);
 	bool readHdf5(const char* path);
-private:
-	bool readH5Group(const Group& group, const char* objName);
-	bool readH5DataSet(const Group& group, const char* objName);
-	bool objTraverse(const Group& group);
 
+	ULLONG getMemSize();
+	EigenH51Dim getH5Data1Dim();
+	EigenH52Dim getH5Data2Dim();
 private:
-	H5Data1Dim m_data1Dim;
-	H5Data2Dim m_data2Dim;
+	bool readH5Group(const H5::Group& group, const char* objName);
+	bool readH5DataSet(const H5::Group& group, const char* objName);
+	bool objTraverse(const H5::Group& group);
+	void clearH5Data();
+private:
+	H5Data m_h5Data;
+	EigenH51Dim m_eigenH51Dim;
+	EigenH52Dim m_eigenH52Dim;
+	
 	ULLONG m_memSize;
 };
 
