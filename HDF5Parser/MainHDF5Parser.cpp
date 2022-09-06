@@ -91,7 +91,7 @@ int Test() {
 }
 
 const char* fileName = "Lee.h5";
-const char* datasetName = "Matrix in file";
+const char* datasetName = "Matrix";
 const int   MSPACE1_RANK = 1;   // Rank of the first dataset in memory
 const int   MSPACE1_DIM = 50;   // Dataset size in memory
 const int   MSPACE2_RANK = 1;   // Rank of the second dataset in memory
@@ -131,8 +131,8 @@ int HDF5Write() {
         /*
          * Create dataspace for the dataset in the file.
          */
-        hsize_t fdim[] = { FSPACE_DIM1, FSPACE_DIM2 }; // dim sizes of ds (on disk)
-        DataSpace fspace(FSPACE_RANK, fdim);
+        hsize_t fdim[] = { 4, 5, 9 }; // dim sizes of ds (on disk)
+        DataSpace fspace(3, fdim);
         /*
          * Create dataset and write it into the file.
          */
@@ -140,7 +140,7 @@ int HDF5Write() {
         /*
          * Select hyperslab for the dataset in the file, using 3x2 blocks,
          * (4,3) stride and (2,4) count starting at the position (0,1).
-         */
+         */ 
         hsize_t start[2]; // Start of hyperslab
         hsize_t stride[2]; // Stride of hyperslab
         hsize_t count[2];  // Block count
@@ -230,6 +230,7 @@ int HDF5Write() {
         delete dataset;
         delete file;
 
+        return 0;
 		cout << "========================================== read start" << endl;
 
         /*
@@ -346,33 +347,47 @@ int HDF5Write() {
 #include "Hdf5Reader.h"
 #include "Hdf5Group.h"
 #include "Hdf5Parser.h"
+#include "StlParser.h"
 
-#define MEMORY_MAX1 10 * 1024 * 1024 * 1024		// 10G
+void Test(vector<double>&& vec) {
+    vector<double> aa;
+    aa.emplace_back(1.0);
+	aa.emplace_back(2.0);
+
+    vec = aa;
+}
+
 
 int main()
 {
-    std::cout << "################### Hello World!\n" << endl;
+    vector<double> a;
+    // Test(a);
+
+//    StlParser stlParser;
+//    stlParser.readStlData("feiji.stl");
+
+
+
+ //   HDF5Write();
+ //   std::cout << "################### Hello World!\n" << endl;
 
 	Hdf5Parser parser;
 
 	parser.readHdf5("SystemResponse.h5"); //SystemResponse
 
-    H5Data data;
-    parser.getHdf5Data(data);
+    //H5Data data;
+    //parser.getHdf5Data(data);
+    parser.getCurveFilterInfo();
 
-    cout << endl << endl;
-    for (auto d : data.data1Dim)
-    {
-        cout << d.first << " 1 " << d.second << endl;
-    }
+    BaseDatumPara para;
+    para.type = Curve;
+    para.objectName = "Ground";
+    para.characteristicName = "Position";
+    para.componentName = "x";
+    para.sonObjName = "Marker_0";
+    vector<double> res = parser.getBaseDatum(para);
 
-	for (auto d : data.data2Dim)
-	{
-		cout << d.first << " 2 " << d.second << endl;
-	}
-
-	cout << parser.getMemSize() << endl;
-
-
+    int count = 0;
+    int count2 = 0;
 
 }
