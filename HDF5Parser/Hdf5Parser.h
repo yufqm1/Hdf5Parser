@@ -29,6 +29,7 @@ typedef struct Hdf5Data
 	EigenH52Dim data2Dim;
 } H5Data;
 
+//----------------------
 struct Component {
 	string name;
 	vector<double> values;
@@ -49,6 +50,20 @@ struct Filter {
 	string name;
 	vector<Object> object;
 };
+//---------------------------------
+
+struct BaseNode
+{
+	string name;
+	std::vector<BaseNode*> nodeVec;
+};
+
+struct NodeObject {
+	string name;
+	NodeObject* nobj = nullptr;
+
+	BaseNode* node;
+};
 
 struct TimeStamps
 {
@@ -65,17 +80,30 @@ struct BaseDatumPara
 	string componentName; 
 };
 
+struct ItemNode {
+	ItemNode* parent;
+	std::string name;
+	vector<ItemNode*> itemVec;
+	vector<ItemNode*> subVec;
+};
+
+struct Item {
+	std::string name;
+	ItemNode* itemNode;
+	Item* item = nullptr;
+};
+
 class Hdf5Parser
 {
 public:
 	Hdf5Parser();
 	~Hdf5Parser();
-
 	bool readHdf5(const char* path);
 	// an interface for the constraint of curve
 	TimeStamps getTimeStamps();
 	Filter getCurveFilterInfo();
-	vector<double> getBaseDatum(const BaseDatumPara& para);
+	vector<double> getBaseDatum(const BaseDatumPara& para); // const ItemNode& para
+	bool getDataInfo(Item* item);
 private:
 	bool readH5Group(const H5::Group& group, const char* objName);
 	bool readH5DataSet(const H5::Group& group, const char* objName);
@@ -91,6 +119,10 @@ private:
 	std::vector<double> getComponent(std::string character, std::string component);
 
 	void getHdf5Data(H5Data& h5Data);
+
+	vector<string> getObjects();
+	vector<string> getCharacteristics();
+	
 private:
 	H5Data m_h5Data;
 	EigenH51Dim m_eigenH51Dim;

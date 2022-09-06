@@ -36,6 +36,35 @@ void Hdf5Parser::getHdf5Data(H5Data& h5Data)
 	h5Data.data2Dim = m_eigenH52Dim;
 }
 
+vector<string> Hdf5Parser::getObjects()
+{
+	vector<string> objNames;
+	for (auto index : m_curveIndex)
+	{
+		objNames.emplace_back(index.first);
+	}
+
+	return objNames;
+}
+
+vector<string> Hdf5Parser::getCharacteristics()
+{
+	vector<string> charNames;
+	for (auto curve : m_curveAttri)
+	{
+		vector<string> vec = split(curve,'/');
+		for (int i = 0; i < vec.size() - 1; i++) // minus 1 since there's a superfluous property called a name
+		{
+			if (vec[i] == "Index" && i + 1 < vec.size())
+			{
+				charNames.emplace_back(vec[i+1]);
+			}
+		}
+	}
+
+	return vector<string>();
+}
+
 EigenH51Dim Hdf5Parser::getH5Data1Dim()
 {
 	return m_eigenH51Dim;
@@ -145,10 +174,10 @@ vector<double> Hdf5Parser::getBaseDatum(const BaseDatumPara& para)
 
 		if (m_curveIndex.find(key) == m_curveIndex.end())
 		{
-			break; 
+			break;
 		}
 
-		int queryIndex = m_curveIndex.at(key)[index]; 
+		int queryIndex = m_curveIndex.at(key)[index];
 
 		string baseKey = "/Curve/";
 		baseKey.append(to_string(queryIndex));
@@ -156,8 +185,8 @@ vector<double> Hdf5Parser::getBaseDatum(const BaseDatumPara& para)
 
 		return curveBaseData.at(baseKey);
 
-		}
-		break;
+	}
+	break;
 	case Animation:
 		break;
 	default:
@@ -168,6 +197,21 @@ vector<double> Hdf5Parser::getBaseDatum(const BaseDatumPara& para)
 
 	return vector<double>();
 }
+
+bool Hdf5Parser::getDataInfo(Item* item)
+{
+	for (auto attri : m_curveIndex)
+	{
+		cout << "----" << attri.first << endl;
+		
+
+
+	}
+
+	return false;
+}
+
+
 
 TimeStamps Hdf5Parser::getTimeStamps()
 {
