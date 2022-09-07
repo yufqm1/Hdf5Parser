@@ -22,7 +22,12 @@ std::vector<std::string> split(const std::string& s, char delim) {
 	return elems;
 }
 
-Hdf5Parser::Hdf5Parser() : m_memSize(0ULL)
+Hdf5Parser::Hdf5Parser() : 
+m_memSize(0ULL),
+m_filter(nullptr),
+m_object(nullptr),
+m_character(nullptr),
+m_component(nullptr)
 {
 }
 
@@ -30,18 +35,21 @@ Hdf5Parser::~Hdf5Parser()
 {
 }
 
-void Hdf5Parser::getHdf5Data(H5Data& h5Data)
+std::vector<std::string> Hdf5Parser::getObjects()
 {
-	h5Data.data1Dim = m_eigenH51Dim;
-	h5Data.data2Dim = m_eigenH52Dim;
-}
+	std::vector<std::string> objNames;
 
-vector<string> Hdf5Parser::getObjects()
-{
-	vector<string> objNames;
 	for (auto index : m_curveIndex)
 	{
-		objNames.emplace_back(index.first);
+		std::vector<std::string> temp = split(index.first, '/');
+		for (int i = 0;i<temp.size() - 1;i++)
+		{
+			if (temp[i] == "Index")
+			{
+				objNames.emplace_back(temp[i+1]);
+			}
+		}
+
 	}
 
 	return objNames;
@@ -49,178 +57,190 @@ vector<string> Hdf5Parser::getObjects()
 
 vector<string> Hdf5Parser::getCharacteristics()
 {
-	vector<string> charNames;
+	std::vector<std::string> charNames;
 	for (auto curve : m_curveAttri)
 	{
-		vector<string> vec = split(curve,'/');
-		for (int i = 0; i < vec.size() - 1; i++) // minus 1 since there's a superfluous property called a name
-		{
-			if (vec[i] == "Index" && i + 1 < vec.size())
-			{
-				charNames.emplace_back(vec[i+1]);
-			}
-		}
-	}
-
-	return vector<string>();
-}
-
-EigenH51Dim Hdf5Parser::getH5Data1Dim()
-{
-	return m_eigenH51Dim;
-}
-
-EigenH52Dim Hdf5Parser::getH5Data2Dim()
-{
-	return m_eigenH52Dim;
-}
-
-Filter Hdf5Parser::getCurveFilterInfo()
-{
-	vector<Component> component;
-
-	Component compX;
-	compX.name = "x";
-	component.emplace_back(compX);
-	Component compY;
-	compY.name = "y";
-	component.emplace_back(compY);
-	Component compZ;
-	compZ.name = "z";
-	component.emplace_back(compZ);
-
-	vector<Characteristic> characteristic;
-	string temp;
-	for (auto attri : m_curveAttri)
-	{
-		Characteristic chara;
-		if (temp == attri.substr(0, attri.length() - 1))
+		if (curve == "Name")
 		{
 			continue;
 		}
-
-		temp = attri.substr(0, attri.length() - 1);
-		chara.name = temp;
-
-
-		chara.component = component;
-		characteristic.emplace_back(chara);
+		charNames.emplace_back(curve.substr(0, curve.length() - 1));
 	}
 
-	vector<Characteristic> sonObj;
-	string sontmp = "";
-	for (auto attri : m_curveIndex)
-	{
-		std::vector<std::string> sonl = split(attri.first, '/');
-		if (sontmp == sonl.back())
-		{
-			continue;
-		}
-		sontmp = sonl.back();
-
-		Characteristic son;
-		son.name = sonl.back();
-		son.component = component;
-		sonObj.emplace_back(son);
-	}
-
-	vector<Object> objects;
-	for (auto st : m_curveIndex)
-	{
-		cout << st.first << endl;
-
-		Object ob;
-		std::vector<std::string> list = split(st.first, '/');
-		for (int i = 0;i < list.size() - 1;i++) // minus 1 since there's a superfluous property called a name
-		{
-			if (list[i] == "Index" && i + 1 < list.size())
-			{
-				ob.name = list[i + 1];
-			}
-		}
-
-		ob.characters = characteristic;
-		ob.sonObj = sonObj;
-		objects.emplace_back(ob);
-	}
-
-	Filter filter;
-	filter.name = "constraint";
-	filter.object = objects;
-
-	return Filter();
+	return charNames;
 }
 
-vector<double> Hdf5Parser::getBaseDatum(const BaseDatumPara& para)
+vector<ItemNode*> Hdf5Parser::createItemNodes(ItemNode* parent,const char* name)
 {
-	switch (para.type)
-	{
-	case Curve:
-	{
-		string key = "/Curve/Index/";
-		key.append(para.objectName);
-		key.append("/Markers/");
-		key.append(para.sonObjName);
+	std::vector<ItemNode*> nodeVec;
+	std::string s_name = name;
+	if (s_name == "Filter") {
+		ItemNode *node = new ItemNode("constraint");
+		node->pre = parent;
+		node->itemVec = createItemNodes(node,"Object");
+		nodeVec.emplace_back(node);
 
-		int index = 0;
-		for (int i = 0; i < m_curveAttri.size(); i++)
-		{
-			if (strstr(m_curveAttri[i].c_str(), para.characteristicName.c_str()))
-			{
-				index = i;
-				break;
-			}
+		m_filter->itemVec = nodeVec;
+	}
+	else if (s_name == "Object") {
+		std::vector<std::string> obNames = getObjects();
+		for (auto name : obNames) {
+			ItemNode* node = new ItemNode(name.c_str());
+			node->pre = parent;
+			//node->itemVec = createItemNodes(node,"Characteristic");
+			node->subVec = createItemNodes(node,"SubObject");
+			nodeVec.emplace_back(node);
 		}
 
-		if (m_curveIndex.find(key) == m_curveIndex.end())
+		m_object->itemVec = nodeVec;
+	}
+	else if (s_name == "SubObject") {
+		string subtmp = "";
+		for (auto attri : m_curveIndex)
 		{
+			std::vector<std::string> sublist = split(attri.first, '/');
+			if (subtmp == sublist.back())
+			{
+				continue;
+			}
+			subtmp = sublist.back();
+
+			ItemNode* node = new ItemNode(subtmp.c_str());
+			node->pre = parent;
+			node->itemVec = createItemNodes(node, "Characteristic");
+			nodeVec.emplace_back(node);
+		}
+	}
+	else if (s_name == "Characteristic") {
+		std::vector<std::string> obNames = getCharacteristics();
+		for (auto name : obNames) {
+			ItemNode* node = new ItemNode(name.c_str());
+			node->pre = parent;
+			node->itemVec = createItemNodes(node, "Component");
+			nodeVec.emplace_back(node);
+		}
+
+		m_character->itemVec = nodeVec;
+
+	}
+	else if (s_name == "Component") {
+		ItemNode* nodeX = new ItemNode("x");
+		ItemNode* nodeY = new ItemNode("y");
+		ItemNode* nodeZ = new ItemNode("z");
+		nodeX->pre = parent;
+		nodeY->pre = parent;
+		nodeZ->pre = parent;
+		nodeVec.emplace_back(nodeX);
+		nodeVec.emplace_back(nodeY);
+		nodeVec.emplace_back(nodeZ);
+
+		m_component->itemVec = nodeVec;
+	}
+	else {
+		// TODO
+	}
+
+	return nodeVec;
+}
+
+H5Item* Hdf5Parser::getH5Item()
+{
+	ItemNode* head = nullptr;
+	m_filter = new H5Item("Filter");
+	m_object = new H5Item("Object");
+	m_character = new H5Item("Characteristic");
+	m_component = new H5Item("Component");
+
+	m_filter->next = m_object;
+	m_object->next = m_character;
+	m_character->next = m_component;
+	m_component->next = nullptr;
+
+	m_filter->itemVec = createItemNodes(head, m_filter->name.c_str());
+
+	return m_filter;
+}
+
+std::vector<double> Hdf5Parser::getCurveDateSet(ItemNode* itemNode)
+{
+	ItemNode* node = nullptr;
+	if (nullptr == itemNode) {
+		return std::vector<double>();
+	}
+
+	std::string component = itemNode->name;
+	node = itemNode->pre;
+	std::string character = (node != nullptr) ? node->name : "";
+	node = node->pre;
+	std::string subObject = (node != nullptr) ? node->name : "";
+	node = node->pre;
+	std::string object = (node != nullptr) ? node->name : "";
+
+
+	std::string key = "/Curve/Index/";
+	key.append(object);
+	key.append("/Markers/");
+	key.append(subObject);
+
+	int index = 0;
+	for (int i = 0; i < m_curveAttri.size(); i++)
+	{
+		if (strstr(m_curveAttri[i].c_str(), character.c_str()))
+		{
+			index = i;
 			break;
 		}
-
-		int queryIndex = m_curveIndex.at(key)[index];
-
-		string baseKey = "/Curve/";
-		baseKey.append(to_string(queryIndex));
-
-
-		return curveBaseData.at(baseKey);
-
-	}
-	break;
-	case Animation:
-		break;
-	default:
-		break;
 	}
 
-
-
-	return vector<double>();
-}
-
-bool Hdf5Parser::getDataInfo(Item* item)
-{
-	for (auto attri : m_curveIndex)
+	if (m_curveIndex.find(key) == m_curveIndex.end())
 	{
-		cout << "----" << attri.first << endl;
-		
-
-
+		return std::vector<double>();
 	}
 
-	return false;
+	int queryIndex = m_curveIndex.at(key)[index];
+
+	std::string baseKey = "/Curve/";
+	baseKey.append(to_string(queryIndex));
+
+	return m_curveBaseData.at(baseKey);
+
 }
 
-
-
-TimeStamps Hdf5Parser::getTimeStamps()
+std::vector<double> Hdf5Parser::getTimeStamps()
 {
 	return m_timeStamps;
 }
 
-ULLONG Hdf5Parser::getMemSize()
+DouMap Hdf5Parser::getAnimationBaseData()
 {
-	return m_memSize;
+	return m_animationBaseData;
+}
+
+IntMap Hdf5Parser::getAnimationIndex()
+{
+	IntMap resIndex;
+	for (auto idx : m_animationIndex)
+	{
+		std::vector<std::string> idxVec = split(idx.first,'/');
+		std::string newKey;
+		for (int i = 0; i< idxVec.size() - 1; i++)
+		{
+			if (idxVec[i] == "Index")
+			{
+				newKey = "/Index/" + idxVec[i + 1];
+			}
+		}
+
+		std::vector<int> temp;
+		for (int i = 0;i<idx.second.size();i++)
+		{
+			temp.emplace_back(idx.second.at(i));
+		}
+
+		resIndex.insert(std::pair<std::string, std::vector<int>>(newKey, temp));
+	}
+
+	return resIndex;
 }
 
 bool Hdf5Parser::readHdf5(const char* path)
@@ -234,21 +254,6 @@ bool Hdf5Parser::readHdf5(const char* path)
 	}
 
 	return true;
-}
-
-std::vector<std::string> Hdf5Parser::getCurveObjectNames()
-{
-	return std::vector<std::string>();
-}
-
-std::vector<std::string> Hdf5Parser::getCurveCharaceristic()
-{
-	return std::vector<std::string>();
-}
-
-std::vector<double> Hdf5Parser::getComponent(std::string character, std::string component)
-{
-	return std::vector<double>();
 }
 
 // recurse to read group
@@ -274,9 +279,12 @@ bool Hdf5Parser::readH5DataSet(const H5::Group& group, const char* objName)
 	int rank = fspace.getSimpleExtentDims(dims_size, NULL);
 	if (rank == 1)	// one dim dataSet
 	{
+		char buffname[OBJ_NAME_LEN] = { 0 };
+		dataset.getObjName(buffname, OBJ_NAME_LEN);
+
 		int dimNum = dims_size[0];
 		hsize_t start[1] = { 0 };
-		hsize_t count[1] = { dimNum };
+		hsize_t count[1] = { static_cast<hsize_t>(dimNum) };
 
 		H5::DataSpace mspace(rank, dims_size);
 		mspace.selectHyperslab(H5S_SELECT_SET, count, start, NULL, NULL);
@@ -301,10 +309,6 @@ bool Hdf5Parser::readH5DataSet(const H5::Group& group, const char* objName)
 			return false;
 		}
 
-		char buffname[OBJ_NAME_LEN] = { 0 };
-		dataset.getObjName(buffname, OBJ_NAME_LEN);
-		// m_eigenH51Dim.insert(std::pair<std::string, Eigen::VectorXd>(buffname, vec));
-
 		// get attribute
 		if (m_curveAttri.empty() && strstr(buffname, "/Curve/Index/"))
 		{
@@ -322,7 +326,7 @@ bool Hdf5Parser::readH5DataSet(const H5::Group& group, const char* objName)
 		// classification
 		if (strstr(buffname, "/Curve/") && !strstr(buffname,"/Curve/Index/"))
 		{
-			curveBaseData.insert(std::pair<std::string, std::vector<double>>(buffname, temp));
+			m_curveBaseData.insert(std::pair<std::string, std::vector<double>>(buffname, temp));
 		}
 		else if (strstr(buffname, "/Curve/Index/"))
 		{
@@ -332,7 +336,9 @@ bool Hdf5Parser::readH5DataSet(const H5::Group& group, const char* objName)
 
 		if (strstr(buffname, "/Animation/") && !strstr(buffname, "/Animation/Index/"))
 		{
-			animationBaseData.insert(std::pair<std::string, std::vector<double>>(buffname, temp));
+			std::string tempBuffName = buffname;
+			tempBuffName = tempBuffName.substr(11);
+			m_animationBaseData.insert(std::pair<std::string, std::vector<double>>(tempBuffName, temp));
 		} else if (strstr(buffname, "/Animation/Index/"))
 		{
 			m_animationIndex.insert(std::pair<std::string, std::vector<double>>(buffname, temp));
@@ -340,8 +346,7 @@ bool Hdf5Parser::readH5DataSet(const H5::Group& group, const char* objName)
 
 		if (strstr(buffname,"/TimeStamps"))
 		{
-			m_timeStamps.name = "TimeStamps";
-			m_timeStamps.stamps = temp;
+			m_timeStamps = temp;
 		}
 		
 	}
@@ -352,7 +357,7 @@ bool Hdf5Parser::readH5DataSet(const H5::Group& group, const char* objName)
 		int col = dims_size[1];
 		int dim = row * col;
 		hsize_t start[2] = { 0 };
-		hsize_t count[2] = { row,col };
+		hsize_t count[2] = { static_cast<hsize_t>(row),static_cast<hsize_t>(col) };
 
 		H5::DataSpace mspace(rank, dims_size);
 		mspace.selectHyperslab(H5S_SELECT_SET, count, start, NULL, NULL);
@@ -438,9 +443,15 @@ bool Hdf5Parser::objTraverse(const H5::Group& group)
 	return isTraverse;
 }
 
+ULLONG Hdf5Parser::getMemSize()
+{
+	return m_memSize;
+}
+
 void Hdf5Parser::clearH5Data()
 {
-	m_eigenH51Dim.clear();
-	m_eigenH52Dim.clear();
+	// if the value exceeds a certain size, clear related vector
+
+
 }
 

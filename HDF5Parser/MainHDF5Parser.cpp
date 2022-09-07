@@ -366,8 +366,6 @@ int main()
 //    StlParser stlParser;
 //    stlParser.readStlData("feiji.stl");
 
-
-
  //   HDF5Write();
  //   std::cout << "################### Hello World!\n" << endl;
 
@@ -375,19 +373,25 @@ int main()
 
 	parser.readHdf5("SystemResponse.h5"); //SystemResponse
 
-    //H5Data data;
-    //parser.getHdf5Data(data);
-    parser.getCurveFilterInfo();
+    H5Item* item = parser.getH5Item();
 
-    BaseDatumPara para;
-    para.type = Curve;
-    para.objectName = "Ground";
-    para.characteristicName = "Position";
-    para.componentName = "x";
-    para.sonObjName = "Marker_0";
-    vector<double> res = parser.getBaseDatum(para);
+    string name = item->name;
+    vector<ItemNode*> nodes = item->itemVec;
 
+    ItemNode* cons = item->itemVec[0];
+    ItemNode* obj = cons->itemVec[2];
+    ItemNode* subobj = obj->subVec[0];
+    ItemNode* chara = subobj->itemVec[0];
+    ItemNode* comp = chara->itemVec[2];
+
+    vector<double> data = parser.getCurveDateSet(comp);
     int count = 0;
     int count2 = 0;
+
+    vector<double> vec = parser.getTimeStamps();
+    DouMap ex1 = parser.getAnimationBaseData();
+    IntMap ex2 = parser.getAnimationIndex();
+
+    parser.getAnimationIndex();
 
 }
