@@ -55,16 +55,16 @@ std::vector<std::string> Hdf5Parser::getObjects()
 	return objNames;
 }
 
-vector<string> Hdf5Parser::getCharacteristics()
+set<string> Hdf5Parser::getCharacteristics()
 {
-	std::vector<std::string> charNames;
+	std::set<std::string> charNames;
 	for (auto curve : m_curveAttri)
 	{
 		if (curve == "Name")
 		{
 			continue;
 		}
-		charNames.emplace_back(curve.substr(0, curve.length() - 1));
+		charNames.insert(curve.substr(0, curve.length() - 1));
 	}
 
 	return charNames;
@@ -112,7 +112,7 @@ vector<ItemNode*> Hdf5Parser::createItemNodes(ItemNode* parent,const char* name)
 		}
 	}
 	else if (s_name == "Characteristic") {
-		std::vector<std::string> obNames = getCharacteristics();
+		std::set<std::string> obNames = getCharacteristics();
 		for (auto name : obNames) {
 			ItemNode* node = new ItemNode(name.c_str());
 			node->pre = parent;
@@ -161,8 +161,10 @@ H5Item* Hdf5Parser::getH5Item()
 	return m_filter;
 }
 
-std::vector<double> Hdf5Parser::getCurveDateSet(ItemNode* itemNode)
+std::vector<double> Hdf5Parser::getCurveDateSet(const ItemNode* itemNode)
 {
+	std::vector<double> result;
+
 	ItemNode* node = nullptr;
 	if (nullptr == itemNode) {
 		return std::vector<double>();
@@ -170,12 +172,25 @@ std::vector<double> Hdf5Parser::getCurveDateSet(ItemNode* itemNode)
 
 	std::string component = itemNode->name;
 	node = itemNode->pre;
-	std::string character = (node != nullptr) ? node->name : "";
-	node = node->pre;
-	std::string subObject = (node != nullptr) ? node->name : "";
-	node = node->pre;
-	std::string object = (node != nullptr) ? node->name : "";
+	if (nullptr == node)
+	{
+		return result;
+	}
+	std::string character = node->name;
 
+	node = node->pre;
+	if (nullptr == node)
+	{
+		return result;
+	}
+	std::string subObject = node->name;
+
+	node = node->pre;
+	if (nullptr == node)
+	{
+		return result;
+	}
+	std::string object = node->name;
 
 	std::string key = "/Curve/Index/";
 	key.append(object);
@@ -227,7 +242,7 @@ IntMap Hdf5Parser::getAnimationIndex()
 		{
 			if (idxVec[i] == "Index")
 			{
-				newKey = "/Index/" + idxVec[i + 1];
+				newKey = idxVec[i + 1];
 			}
 		}
 
@@ -337,8 +352,10 @@ bool Hdf5Parser::readH5DataSet(const H5::Group& group, const char* objName)
 		if (strstr(buffname, "/Animation/") && !strstr(buffname, "/Animation/Index/"))
 		{
 			std::string tempBuffName = buffname;
-			tempBuffName = tempBuffName.substr(11);
-			m_animationBaseData.insert(std::pair<std::string, std::vector<double>>(tempBuffName, temp));
+			//tempBuffName = tempBuffName.substr(11);
+			tempBuffName = split(tempBuffName, '/').back();
+
+			m_animationBaseData.insert(std::pair<int, std::vector<double>>(atoi(tempBuffName.c_str()), temp));
 		} else if (strstr(buffname, "/Animation/Index/"))
 		{
 			m_animationIndex.insert(std::pair<std::string, std::vector<double>>(buffname, temp));

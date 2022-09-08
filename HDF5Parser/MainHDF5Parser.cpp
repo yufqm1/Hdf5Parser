@@ -393,5 +393,4 @@ int main()
     IntMap ex2 = parser.getAnimationIndex();
 
     parser.getAnimationIndex();
-
 }

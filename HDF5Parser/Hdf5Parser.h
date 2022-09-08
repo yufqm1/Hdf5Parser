@@ -8,12 +8,13 @@
 
 #include <vector>
 #include <map>
+#include <set>
 #include <queue>
 #include "H5Cpp.h"
 #include "Eigen/Eigen"
 
 typedef unsigned long long ULLONG;
-typedef std::map<std::string, std::vector<double>> DouMap;
+typedef std::map<int, std::vector<double>> DouMap;
 typedef std::map<std::string, std::vector<int>> IntMap;
 struct ItemNode {
 	ItemNode(const char* s_name) {
@@ -42,7 +43,7 @@ public:
 	bool readHdf5(const char* path);
 	// 2D	Curve
 	H5Item* getH5Item();
-	std::vector<double> getCurveDateSet(ItemNode* itemNode); // const ItemNode& para
+	std::vector<double> getCurveDateSet(const ItemNode* itemNode); // const ItemNode& para
 	// 3D	Animation
 	std::vector<double> getTimeStamps();
 	DouMap getAnimationBaseData();
@@ -55,7 +56,7 @@ private:
 	void clearH5Data();
 
 	std::vector<std::string> getObjects();
-	std::vector<std::string> getCharacteristics();
+	std::set<std::string> getCharacteristics();
 	std::vector<ItemNode*> createItemNodes(ItemNode* parent, const char* item);
 	ULLONG getMemSize();
 private:
@@ -72,7 +73,7 @@ private:
 	std::map<std::string, std::vector<double>> m_animationIndex;
 	// base dataset value
 	std::map<std::string, std::vector<double>> m_curveBaseData;
-	std::map<std::string, std::vector<double>> m_animationBaseData;
+	std::map<int, std::vector<double>> m_animationBaseData;
 
 	std::vector<double> m_timeStamps;
 	ULLONG m_memSize;
